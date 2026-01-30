@@ -1,9 +1,9 @@
-# Aidu - Command Line Interface Tool
+# Aido - Command Line Interface Tool
 
 ## Overview
-Aidu is a simple, efficient command-line tool that allows users to interact with system commands via OpenAI's GPT models. The tool executes system commands based on user queries and returns results, making it an excellent assistant for managing tasks or querying system information.
+Aido is a simple, efficient command-line tool that allows users to interact with system commands via OpenAI's GPT models. The tool executes system commands based on user queries and returns results, making it an excellent assistant for managing tasks or querying system information.
 
-Aidu simplifies system-level tasks by leveraging AI, providing natural language interaction for executing shell commands like `ls`, `cat`, `grep`, and more.
+Aido simplifies system-level tasks by leveraging AI, providing natural language interaction for executing shell commands like `ls`, `cat`, `grep`, and more.
 
 ## Features
 - Execute system commands based on natural language queries
@@ -15,8 +15,8 @@ Aidu simplifies system-level tasks by leveraging AI, providing natural language 
 
 1. **Clone the repository:**
     ```bash
-    git clone https://github.com/ddbase3/aidu.git
-    cd aidu
+    git clone https://github.com/ddbase3/aido.git
+    cd aido
     ```
 
 2. **Set up the project**:
@@ -25,8 +25,8 @@ Aidu simplifies system-level tasks by leveraging AI, providing natural language 
 
 3. **Make the script executable:**
     ```bash
-    sudo ln -s /path/to/aidu/aidu.php /usr/local/bin/aidu
-    sudo chmod +x /path/to/aidu/aidu.php
+    sudo ln -s /path/to/aido/aido.php /usr/local/bin/aido
+    sudo chmod +x /path/to/aido/aido.php
     ```
 
 4. **Configure the API key**:
@@ -38,18 +38,18 @@ Aidu simplifies system-level tasks by leveraging AI, providing natural language 
 
 5. **Run the tool**:
     ```bash
-    aidu "Show me the dir content"
+    aido "Show me the dir content"
     ```
 
 ## Usage
 Once installed, you can interact with your system using simple, natural language queries. For example:
 
 ```bash
-aidu "List files in the current directory"
-aidu "What is the current working directory?"
+aido "List files in the current directory"
+aido "What is the current working directory?"
 ````
 
-Aidu will execute the corresponding shell commands (`ls`, `pwd`, etc.) and provide results directly to the terminal.
+Aido will execute the corresponding shell commands (`ls`, `pwd`, etc.) and provide results directly to the terminal.
 
 ## Contributing
 

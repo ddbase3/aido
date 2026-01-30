@@ -180,7 +180,7 @@ $cliTool = new AiToolExecutor($aiKey);
 
 $query = $argv[1] ?? null;
 if (!$query) {
-    echo "Usage: php aidu.php \"Your question here\"\n";
+    echo "Usage: php aido.php \"Your question here\"\n";
     exit;
 }
 
