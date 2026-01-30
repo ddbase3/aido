@@ -15,7 +15,7 @@ Aidu simplifies system-level tasks by leveraging AI, providing natural language 
 
 1. **Clone the repository:**
     ```bash
-    git clone https://github.com/yourusername/aidu.git
+    git clone https://github.com/ddbase3/aidu.git
     cd aidu
     ```
 
