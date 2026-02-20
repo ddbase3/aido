@@ -1,65 +1,302 @@
-# Aido - Command Line Interface Tool
+# Aido – AI-powered CLI assistant
 
-## Overview
-Aido is a simple, efficient command-line tool that allows users to interact with system commands via OpenAI's GPT models. The tool executes system commands based on user queries and returns results, making it an excellent assistant for managing tasks or querying system information.
+Aido is a lightweight PHP command-line tool that lets you solve Linux tasks in natural language. It uses an OpenAI chat model and (when needed) executes system commands via a single built-in tool (`run_command`).
 
-Aido simplifies system-level tasks by leveraging AI, providing natural language interaction for executing shell commands like `ls`, `cat`, `grep`, and more.
+Aido is designed to be practical for day-to-day sysadmin/dev work:
+
+* Ask questions in natural language
+* Aido decides when to run shell commands
+* It can keep conversation history for context
+* It supports **policy-based limits** (tokens/tool loops/history) per **recursion depth**
+* It supports standard CLI flags like `--help` and `--version`
+
+> ⚠️ **Security note**: Aido can execute shell commands. Only run it in environments you trust.
+
+---
 
 ## Features
-- Execute system commands based on natural language queries
-- Easily extendable for additional commands
-- Full interaction through a simple CLI interface
-- Stores conversation history for context-aware responses
+
+* **Natural language → shell actions** via `run_command`
+* **Conversation history** (optional/policy-controlled)
+* **Policy system** (`policy.php`) controlling:
+
+  * model
+  * max tokens
+  * tool loop limit
+  * history mode (persist/temp/none)
+  * override policy (all/safe/none)
+  * recursion max depth
+* **Recursion support** (Aido can call `aido` again via `run_command`) with:
+
+  * automatic `AIDO_DEPTH` increment
+  * enforced `max_depth` from policy
+  * per-depth configuration (e.g., depth 0 full power, depth 1 reduced)
+* **Linux-typical CLI flags**:
+
+  * `--help`, `--version`
+  * `--print-paths`, `--print-config`
+  * overrides: `--tool-loops`, `--max-tokens`, `--history`
+
+---
+
+## Requirements
+
+* PHP CLI (tested with modern PHP versions)
+* `curl` extension enabled for PHP
+* Linux shell environment
+* An OpenAI API key
+
+---
+
+## Repository layout
+
+* `aido.php` – the CLI entry point
+* `sysprompt.txt` – base system prompt text (loaded at runtime)
+* `policy.php` – policy configuration (defaults + profiles + caps)
+* `config.php.example` – example config file containing the API key
+
+Local-only files (ignored by git):
+
+* `config.php` – your API key (secret)
+* `conversation_history.json` – local repo state (optional legacy location)
+
+Runtime state (recommended locations):
+
+* `~/.config/aido/` – user configuration (config/sysprompt/policy)
+* `~/.local/state/aido/` – persistent history
+
+---
 
 ## Installation
 
-1. **Clone the repository:**
-    ```bash
-    git clone https://github.com/ddbase3/aido.git
-    cd aido
-    ```
+Aido is meant to be installed as a simple executable in `/usr/local/bin` and configured in your home directory.
 
-2. **Set up the project**:
-    - Create a `.env` file to store the OpenAI API key.
-    - Make sure the PHP CLI is installed on your machine.
-
-3. **Make the script executable:**
-    ```bash
-    sudo ln -s /path/to/aido/aido.php /usr/local/bin/aido
-    sudo chmod +x /path/to/aido/aido.php
-    ```
-
-4. **Configure the API key**:
-    - Copy the `config.php.example` to `config.php`:
-    ```bash
-    cp config.php.example config.php
-    ```
-    - Open the `config.php` file and insert your **OpenAI API key** into the `key` value.
-
-5. **Run the tool**:
-    ```bash
-    aido "Show me the dir content"
-    ```
-
-## Usage
-Once installed, you can interact with your system using simple, natural language queries. For example:
+### 1) Clone the repository
 
 ```bash
-aido "List files in the current directory"
-aido "What is the current working directory?"
-````
+git clone https://github.com/ddbase3/aido.git
+cd aido
+```
 
-Aido will execute the corresponding shell commands (`ls`, `pwd`, etc.) and provide results directly to the terminal.
+### 2) Install the executable
 
-## Contributing
+This copies the script into your PATH (copy-install, not a symlink):
 
-1. Fork the repository
-2. Clone your forked repository
-3. Create a new branch (`git checkout -b feature-branch`)
-4. Commit your changes (`git commit -m 'Add feature'`)
-5. Push to your branch (`git push origin feature-branch`)
-6. Create a pull request
+```bash
+sudo install -m 755 aido.php /usr/local/bin/aido
+```
+
+Verify:
+
+```bash
+which aido
+aido --version
+```
+
+### 3) Create your user config directory
+
+```bash
+mkdir -p ~/.config/aido
+```
+
+### 4) Configure your API key (`config.php`)
+
+Copy the example config and add your API key:
+
+```bash
+cp -n config.php.example ~/.config/aido/config.php
+chmod 600 ~/.config/aido/config.php
+```
+
+Edit the file and set:
+
+* `openai_api_key` → your key
+
+### 5) Install `sysprompt.txt` and `policy.php`
+
+```bash
+cp -f sysprompt.txt ~/.config/aido/sysprompt.txt
+cp -f policy.php ~/.config/aido/policy.php
+```
+
+### 6) (Optional) Copy existing history
+
+If you have a history file in the repo (legacy), you can move/copy it to the recommended state directory:
+
+```bash
+mkdir -p ~/.local/state/aido
+if [ -f conversation_history.json ]; then
+	cp -f conversation_history.json ~/.local/state/aido/conversation_history.json
+fi
+```
+
+---
+
+## Quick start
+
+```bash
+aido "what changed in this git repository?"
+aido "find large files in /var/log and summarize"
+```
+
+---
+
+## How Aido finds its files
+
+Aido resolves `config.php`, `sysprompt.txt`, and `policy.php` by searching in this order:
+
+1. `$AIDO_HOME/` (if set)
+2. current working directory (`getcwd()`)
+3. script directory (`__DIR__`, e.g. `/usr/local/bin`)
+4. `~/.config/aido/`
+
+This allows:
+
+* working inside a repo (cwd-based files)
+* global usage with `~/.config/aido/` (recommended)
+
+### Debug paths
+
+```bash
+aido --print-paths
+```
+
+---
+
+## CLI usage
+
+### Help
+
+```bash
+aido --help
+```
+
+### Version
+
+```bash
+aido --version
+```
+
+### Show effective config (after policy + depth + caps)
+
+```bash
+aido --print-config
+```
+
+### Override limits (if allowed by policy)
+
+```bash
+aido --tool-loops 15 "do a longer multi-step task"
+aido --max-tokens 900 "write a more detailed explanation"
+aido --history none "answer without storing history"
+```
+
+Overrides are controlled by your policy’s `override_policy` and `caps` for the current depth.
+
+---
+
+## Policy system (`policy.php`)
+
+Aido uses `policy.php` to decide what it’s allowed to do. The policy supports:
+
+* `defaults` – base values
+* `profiles[depth]` – per-depth defaults (e.g., depth 0 = full power, depth 1 = subtask)
+* `caps[depth]` – hard limits per depth (cannot be exceeded)
+* `recursion.max_depth` – maximum recursion depth allowed
+
+### Example behavior (typical)
+
+* **Depth 0** (normal interactive use)
+
+  * higher tokens/tool loops
+  * history persisted
+  * overrides allowed
+
+* **Depth 1** (subtask / recursive call)
+
+  * reduced tokens/tool loops
+  * history temp or none
+  * overrides restricted (`safe`)
+
+* **Depth 2+**
+
+  * usually locked down
+
+---
+
+## Recursion model and safety
+
+Aido can recursively call itself through `run_command`, e.g.:
+
+```bash
+aido 'run this exact command using run_command: aido --print-config'
+```
+
+When Aido detects a self-call (`aido ...` or `/usr/local/bin/aido ...`), it automatically:
+
+* increments `AIDO_DEPTH` (`AIDO_DEPTH=1`, `AIDO_DEPTH=2`, ...)
+* enforces `recursion.max_depth` from `policy.php`
+
+This means recursion behavior is policy-driven:
+
+* per-depth profiles apply automatically
+* recursion stops safely at `max_depth`
+
+---
+
+## Runtime context
+
+At runtime, Aido prepends context to the system prompt (before `sysprompt.txt`) including:
+
+* current time (ISO 8601)
+* current working directory
+* hostname
+* OS info
+* depth + max depth
+* effective limits (model/max tokens/tool loops/history)
+
+This helps the assistant make realistic plans within the configured limits.
+
+---
+
+## Configuration files
+
+### `~/.config/aido/config.php`
+
+Contains your API key. Example:
+
+```php
+<?php
+
+return [
+	'openai_api_key' => 'sk-...'
+];
+```
+
+### `~/.config/aido/sysprompt.txt`
+
+Defines the assistant behavior rules. Aido will prepend runtime context automatically.
+
+### `~/.config/aido/policy.php`
+
+Defines limits and behavior per depth.
+
+---
+
+## Git hygiene
+
+The repo includes a `.gitignore` that ignores local secrets and state:
+
+* `config.php`
+* `conversation_history.json`
+
+Recommended practice:
+
+* keep secrets in `~/.config/aido/`
+* keep state in `~/.local/state/aido/`
+
+---
 
 ## License
 
-This project is licensed under the GNU General Public License v3.0 (GPL-3.0) - see the [LICENSE](LICENSE) file for details.
+GPL-3.0 — see `LICENSE`.
