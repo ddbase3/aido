@@ -442,9 +442,14 @@ function aido_usage(): string {
 		"  --print-config        show effective config\n" .
 		"  --tool-loops N        override tool loop limit\n" .
 		"  --max-tokens N        override max tokens\n" .
-		"  --history MODE        persist|temp|none\n\n" .
+		"  --history MODE        persist|temp|none\n" .
+		"  --stdin               read prompt from STDIN when no question arg is provided\n\n" .
 		"examples:\n" .
 		"  aido \"what changed in this repo?\"\n" .
+		"  echo \"hello\" | aido\n" .
+		"  aido --stdin <<'EOF'\n" .
+		"  build a small demo site\n" .
+		"  EOF\n" .
 		"  aido --print-config\n" .
 		"  aido --tool-loops 15 \"do a longer task\"\n";
 }
@@ -457,7 +462,8 @@ function aido_parse_args(array $argv): array {
 		'print_config' => false,
 		'tool_loops' => null,
 		'max_tokens' => null,
-		'history' => null
+		'history' => null,
+		'stdin' => false
 	];
 
 	$args = [];
@@ -478,6 +484,10 @@ function aido_parse_args(array $argv): array {
 		}
 		if ($a === '--print-config') {
 			$opts['print_config'] = true;
+			continue;
+		}
+		if ($a === '--stdin') {
+			$opts['stdin'] = true;
 			continue;
 		}
 		if ($a === '--tool-loops') {
@@ -559,6 +569,53 @@ function aido_print_config(array $effective, ?string $historyFile, int $depth, i
 	echo "history_file: " . ($historyFile ?? '(none)') . "\n";
 }
 
+function aido_is_tty_stdin(): bool {
+	if (function_exists('posix_isatty')) {
+		return posix_isatty(STDIN);
+	}
+
+	// Fallback: if posix is unavailable, assume non-tty to enable pipes/redirects.
+	return false;
+}
+
+function aido_read_prompt_from_stdin(bool $interactiveHint = true): string {
+	$stdinIsTty = aido_is_tty_stdin();
+
+	if ($stdinIsTty && $interactiveHint) {
+		fwrite(STDERR, "Enter your prompt. Finish with Ctrl-D.\n\n");
+	}
+
+	$input = stream_get_contents(STDIN);
+	return trim((string) $input);
+}
+
+function aido_resolve_query(array $args, array $opts): ?string {
+	$query = $args[0] ?? null;
+	if (is_string($query) && trim($query) !== '') {
+		return $query;
+	}
+
+	$forceStdin = (bool) ($opts['stdin'] ?? false);
+	$stdinIsTty = aido_is_tty_stdin();
+
+	if ($forceStdin || !$stdinIsTty) {
+		$stdinQuery = aido_read_prompt_from_stdin($interactiveHint = $forceStdin && $stdinIsTty);
+		if ($stdinQuery !== '') {
+			return $stdinQuery;
+		}
+	}
+
+	// Interactive mode without --stdin: still allow aido (no args) to read from tty until Ctrl-D.
+	if ($stdinIsTty) {
+		$stdinQuery = aido_read_prompt_from_stdin(true);
+		if ($stdinQuery !== '') {
+			return $stdinQuery;
+		}
+	}
+
+	return null;
+}
+
 // --- CLI Execution ---
 
 [$opts, $args] = aido_parse_args($argv);
@@ -623,8 +680,8 @@ if ($opts['print_config']) {
 	exit(0);
 }
 
-$query = $args[0] ?? null;
-if (!$query) {
+$query = aido_resolve_query($args, $opts);
+if ($query === null || trim($query) === '') {
 	echo aido_usage();
 	exit(1);
 }

@@ -9,6 +9,7 @@ Aido is designed to be practical for day-to-day sysadmin/dev work:
 * It can keep conversation history for context
 * It supports **policy-based limits** (tokens/tool loops/history) per **recursion depth**
 * It supports standard CLI flags like `--help` and `--version`
+* It supports **multi-line prompts via STDIN** (interactive and piped)
 
 > ⚠️ **Security note**: Aido can execute shell commands. Only run it in environments you trust.
 
@@ -17,7 +18,9 @@ Aido is designed to be practical for day-to-day sysadmin/dev work:
 ## Features
 
 * **Natural language → shell actions** via `run_command`
+
 * **Conversation history** (optional/policy-controlled)
+
 * **Policy system** (`policy.php`) controlling:
 
   * model
@@ -26,16 +29,19 @@ Aido is designed to be practical for day-to-day sysadmin/dev work:
   * history mode (persist/temp/none)
   * override policy (all/safe/none)
   * recursion max depth
+
 * **Recursion support** (Aido can call `aido` again via `run_command`) with:
 
   * automatic `AIDO_DEPTH` increment
   * enforced `max_depth` from policy
   * per-depth configuration (e.g., depth 0 full power, depth 1 reduced)
+
 * **Linux-typical CLI flags**:
 
   * `--help`, `--version`
   * `--print-paths`, `--print-config`
   * overrides: `--tool-loops`, `--max-tokens`, `--history`
+  * input modes: `--stdin`
 
 ---
 
@@ -138,6 +144,51 @@ fi
 aido "what changed in this git repository?"
 aido "find large files in /var/log and summarize"
 ```
+
+---
+
+## Multi-line prompts (STDIN)
+
+Aido can read the prompt from **STDIN**. This is useful for:
+
+* multi-line prompts
+* piping text from other tools
+* keeping long instructions out of shell quotes
+
+### Pipe input
+
+```bash
+echo "summarize the changes in this repo" | aido
+```
+
+### Redirect from a file
+
+```bash
+aido < prompt.txt
+```
+
+### Here-doc
+
+```bash
+aido --stdin <<'EOF'
+Create a small demo website with 3 pages.
+Use a clean responsive layout.
+Download placeholder images and reference them locally.
+EOF
+```
+
+### Interactive entry (finish with Ctrl-D)
+
+```bash
+aido
+# type your prompt (multiple lines)
+# finish input with Ctrl-D (EOF)
+```
+
+Notes:
+
+* Use **Ctrl-D** (EOF) to end input. Ctrl-C typically aborts the program.
+* If you provide a normal quoted argument (`aido "..."`), STDIN is ignored.
 
 ---
 
