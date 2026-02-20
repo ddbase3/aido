@@ -1,3 +1,7 @@
+# local secrets / state
 config.php
 conversation_history.json
 
+# optional local overrides
+policy.local.php
+sysprompt.local.txt
