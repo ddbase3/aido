@@ -83,6 +83,10 @@ class AiToolExecutor {
 		file_put_contents($this->historyFile, $json, LOCK_EX);
 	}
 
+	private function printTool(string $label, string $text): void {
+		echo "\033[33m[{$label}]: {$text}\033[0m\n";
+	}
+
 	/**
 	 * Calls OpenAI chat completions with:
 	 * - basic retry on rate limit (429)
@@ -189,50 +193,50 @@ class AiToolExecutor {
 		while (true) {
 			$attempt++;
 
-$ch = curl_init();
-curl_setopt($ch, CURLOPT_URL, 'https://api.openai.com/v1/chat/completions');
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_HEADER, true);
-curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+			$ch = curl_init();
+			curl_setopt($ch, CURLOPT_URL, 'https://api.openai.com/v1/chat/completions');
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch, CURLOPT_POST, true);
+			curl_setopt($ch, CURLOPT_HEADER, true);
+			curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+			curl_setopt($ch, CURLOPT_TIMEOUT, 120);
 
-// Stabilität: HTTP/1.1 erzwingen (vermeidet seltene HTTP/2 stalls)
-curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+			// Stabilität: HTTP/1.1 erzwingen (vermeidet seltene HTTP/2 stalls)
+			curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
 
-// Optional: IPv4 erzwingen (nur wenn du sporadische Netz-/Route-Probleme hast)
-// curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+			// Optional: IPv4 erzwingen (nur wenn du sporadische Netz-/Route-Probleme hast)
+			// curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
 
-// Dein Low-Speed-Wächter war zu aggressiv (15s). Lass ihn drin, aber realistisch.
-curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1); // bytes/sec
-curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 120); // seconds
+			// Dein Low-Speed-Wächter war zu aggressiv (15s). Lass ihn drin, aber realistisch.
+			curl_setopt($ch, CURLOPT_LOW_SPEED_LIMIT, 1); // bytes/sec
+			curl_setopt($ch, CURLOPT_LOW_SPEED_TIME, 120); // seconds
 
-$payload = json_encode($requestData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-if ($payload === false) {
-	curl_close($ch);
-	throw new Exception('JSON encode failed: ' . json_last_error_msg());
-}
+			$payload = json_encode($requestData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+			if ($payload === false) {
+				curl_close($ch);
+				throw new Exception('JSON encode failed: ' . json_last_error_msg());
+			}
 
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-	'Content-Type: application/json',
-	'Authorization: Bearer ' . $this->openaiApiKey,
-	'Accept: application/json',
-	'Expect:' // verhindert 100-continue Edge-Cases
-]);
+			curl_setopt($ch, CURLOPT_HTTPHEADER, [
+				'Content-Type: application/json',
+				'Authorization: Bearer ' . $this->openaiApiKey,
+				'Accept: application/json',
+				'Expect:' // verhindert 100-continue Edge-Cases
+			]);
 
-curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+			curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
 
-$response = curl_exec($ch);
-if ($response === false) {
-	$err = curl_error($ch);
-	$errno = curl_errno($ch);
-	curl_close($ch);
-	throw new Exception('cURL Error (' . $errno . '): ' . $err);
-}
+			$response = curl_exec($ch);
+			if ($response === false) {
+				$err = curl_error($ch);
+				$errno = curl_errno($ch);
+				curl_close($ch);
+				throw new Exception('cURL Error (' . $errno . '): ' . $err);
+			}
 
-$httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$headerSize = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-curl_close($ch);
+			$httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+			$headerSize = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+			curl_close($ch);
 
 			$rawHeaders = substr((string) $response, 0, $headerSize);
 			$rawBody = substr((string) $response, $headerSize);
@@ -512,12 +516,14 @@ curl_close($ch);
 					$mkdirp = isset($arguments['mkdirp']) ? (bool) $arguments['mkdirp'] : true;
 					$overwrite = isset($arguments['overwrite']) ? (bool) $arguments['overwrite'] : true;
 
-					$result = $this->writeFile(
-						(string) $arguments['path'],
-						(string) $arguments['content'],
-						$mkdirp,
-						$overwrite
-					);
+					$path = (string) $arguments['path'];
+					$content = (string) $arguments['content'];
+
+					$this->printTool('Writing', $path . ' (bytes=' . strlen($content) . ', mkdirp=' . ($mkdirp ? '1' : '0') . ', overwrite=' . ($overwrite ? '1' : '0') . ')');
+
+					$result = $this->writeFile($path, $content, $mkdirp, $overwrite);
+
+					$this->printTool('WriteResult', $result);
 
 					$messages[] = [
 						'role' => 'function',
@@ -532,7 +538,13 @@ curl_close($ch);
 					$maxBytes = isset($arguments['max_bytes']) ? (int) $arguments['max_bytes'] : 200000;
 					$maxBytes = max(1, $maxBytes);
 
-					$result = $this->readFile((string) $arguments['path'], $maxBytes);
+					$path = (string) $arguments['path'];
+
+					$this->printTool('Reading', $path . ' (max_bytes=' . $maxBytes . ')');
+
+					$result = $this->readFile($path, $maxBytes);
+
+					$this->printTool('ReadResult', 'bytes=' . strlen($result));
 
 					$messages[] = [
 						'role' => 'function',
@@ -547,7 +559,13 @@ curl_close($ch);
 					$headBytes = isset($arguments['head_bytes']) ? (int) $arguments['head_bytes'] : 16;
 					$headBytes = max(0, min(4096, $headBytes));
 
-					$result = $this->fileInfo((string) $arguments['path'], $headBytes);
+					$path = (string) $arguments['path'];
+
+					$this->printTool('FileInfo', $path . ' (head_bytes=' . $headBytes . ')');
+
+					$result = $this->fileInfo($path, $headBytes);
+
+					$this->printTool('FileInfoResult', 'ok');
 
 					$messages[] = [
 						'role' => 'function',
